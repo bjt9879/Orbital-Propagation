@@ -38,6 +38,7 @@ global mu  opsmode infile outfile  satrec startmfe stopmfe deltamin typerun...
     startedit stopedit s1
 clear adum grob azob HorEl ElSR ElGR
 
+tic
 
 %% Configuration Section
 
@@ -49,7 +50,7 @@ rad = 180.0 / pi;
 % Epoch
 startedit='26-Jan-2017 00:00:00'; % UTC start time  01-Feb-2016 02:25:03
 stopedit='29-Jan-2017 00:00:00'; 
-s1='10'; %step resolution (min)
+s1='1'; %step resolution (min)
 
 min_dist=10; % Min Distance threshold in Km
 rp_tolerance=10; % perigee radius tolerance in Km
@@ -61,7 +62,7 @@ subject_file='\ExampleInput\vrss1.txt';
 subject_output='subject_output.txt';
 subject_output_refined='subject_output_refined.txt';
 catalog_file='\ExampleInput\Full_Catalog_1.txt';
-close_approach_file='sat_names_output_new.txt';
+close_approach_file='sat_names_output.txt';
 close_approach_refined='sat_close_approach_refined_';
 
 
@@ -238,7 +239,7 @@ while (feof(infile) == 0)
     end
     longstr2 = fgets(infile, 130);
     catno = strtrim(longstr1(3:7)); % Satelite Number
-    disp(strcat('Propagating satellite: ',num2str(catno)));
+    %disp(strcat('Propagating satellite: ',num2str(catno)));
     % Convert the TLE to RV
 
     [satrec, startmfe, stopmfe, deltamin] = twoline2rv( whichconst, ...
@@ -295,9 +296,11 @@ while (feof(infile) == 0)
         % Check for closest aproach distance and save it in file
         if delta_r<=min_dist
          fprintf(outfile,'%5s %16.8f %5i%3i%3i %2i:%2i:%9.6f \n',catno,delta_r,year,mon,day,hr,minute,sec);
-         disp('Close approach');
-         sat_no_list(i,1)=str2num(catno);
-         i=1+1;
+         disp('********************   Close approach   *****************');
+         disp(str2double(catno));
+         disp(delta_r);
+         sat_no_list(i,1)=str2double(catno);
+         i=i+1;
          break;
         end
         k=k+1;
@@ -461,7 +464,7 @@ i=1; %counter for satellite number list
 
 while (feof(infile) == 0)
     
-    min_distance=100;
+    min_distance=1000;
     
     longstr1 = fgets(infile, 130);
     while ( (longstr1(1) == '#') && (feof(infile) == 0) )
@@ -470,12 +473,11 @@ while (feof(infile) == 0)
     longstr2 = fgets(infile, 130);
     catno = strtrim(longstr1(3:7)); % Target Satelite Number
     if str2double(catno)~=sat_no_list(i,1)
-        disp('ajaaaaa');
-        break;
+        continue;
     end
     
     % output file for RV Distance Date etc
-    outpath = strcat(close_approach_file_refined_,num2str(catno),'.txt');
+    outpath = strcat(close_approach_refined,num2str(catno),'.txt');
     outfilename = outpath;
     outfile = fopen(outfilename, 'wt+');
     if (outfile == -1)
@@ -529,36 +531,47 @@ while (feof(infile) == 0)
                 delta_r=((r_1(k,1)-r_o(k,1))^2+(r_1(k,2)-r_o(k,2))^2+(r_1(k,3)-r_o(k,3))^2)^(1/3);
                 if delta_r<min_distance
                     min_distance=delta_r;
-                    disp(min_distance);
+                    
                 end
                 %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-                fprintf(outfile,'%5s %16.8f %16.8f %16.8f %16.8f %5i%3i%3i %2i:%2i:%9.6f \n',catno,ro(1),ro(2),ro(3),delta_r,year,mon,day,hr,minute,sec);
+                fprintf(outfile,'%5s %16.8f %16.8f %16.8f %16.8f %5i %3i %3i %2i %2i %9.6f \n',catno,ro(1),ro(2),ro(3),delta_r,year,mon,day,hr,minute,sec);
             end
         end %// if satrec.error == 0
         
         % Check for closest aproach distance and save it in file
         
     end %// while propagating the orbit
-
+    disp(min_distance);
     i=i+1;
+    if i>size(sat_no_list,1)
+        break
+    end
 end %// While Catalog
 
-
+disp('End of Propagation');
 fclose('all');
 
-
+toc
 
 %% Ploting trajectory based on R
 % 
-% outfile=fopen('subject_output.txt');
+% outfile=fopen('subject_output_refined.txt');
 % s=textscan(outfile,' %f %f %f %f %f %f %d %d %d %d %d %d');
 % fclose(outfile);
 % x=s{1};
 % y=s{2};
 % z=s{3};
-% u=s{4};
-% v=s{5};
-% w=s{6};
+% % u=s{4};
+% % v=s{5};
+% % w=s{6};
+% 
+% outfile=fopen('sat_close_approach_refined_29110.txt');
+% s=textscan(outfile,'%f %f %f %f %d %d %d %d %d %d %d');
+% fclose(outfile);
+% x1=s{2};
+% y1=s{3};
+% z1=s{4};
+% 
 % 
 % close all
 % set(gcf,'Menubar','default','Name','Orbit Visualization', ... 
@@ -589,15 +602,26 @@ fclose('all');
 %     x0=0;
 %     y0=0;
 %     z0=0;
+%     
+%     x1_0=0;
+%     y1_0=0;
+%     z1_0=0;
+%     
 %     for k=1:length(x)
 %      line([x0 x(k)],[y0 y(k)],[z0 z(k)]);
 %      x0=x(k);
 %      y0=y(k);
 %      z0=z(k);
+%      
+%      line([x1_0 x1(k)],[y1_0 y1(k)],[z1_0 z1(k)],'Color','r');
+%      x1_0=x1(k);
+%      y1_0=y1(k);
+%      z1_0=z1(k);
+%      
 %      pause (0.01);
 %     end
-
-
+% 
+% 
 
 
 %%% Change Log
