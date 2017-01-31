@@ -502,7 +502,6 @@ while (feof(infile) == 0)
 
     %%     loop to perform the main propagation
     k=1;
-    tic
     %                
     while ((tsince < stopmfe) && (satrec.error == 0))
         
