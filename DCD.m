@@ -50,24 +50,22 @@ rad = 180.0 / pi;
 % Epoch
 startedit='26-Jan-2017 00:00:00'; % UTC start time  01-Feb-2016 02:25:03
 stopedit='29-Jan-2017 00:00:00'; 
-s1='1'; %step resolution (min)
+s1='15'; %step resolution (min)
 
-min_dist=10; % Min Distance threshold in Km
+min_dist=40; % Min Distance threshold in Km
 rp_tolerance=10; % perigee radius tolerance in Km
-% Epoch
 
 % File names IO
-% Inputs
 subject_file='\ExampleInput\vrss1.txt';
 subject_output='subject_output.txt';
 subject_output_refined='subject_output_refined.txt';
-catalog_file='\ExampleInput\Full_Catalog_1.txt';
+catalog_file='\ExampleInput\Full_Catalog.tle';
 close_approach_file='sat_names_output.txt';
 close_approach_refined='sat_close_approach_refined_';
 
-
 %% Loading Files both input & output
 
+disp('Loading Subject TLE file');
 inpath=subject_file;
 infilename = inpath;
 infile = fopen(infilename, 'r');
@@ -75,7 +73,6 @@ if (infile == -1)
     fprintf(1,'Failed to open file: %s\n', infilename);
     return;
 end
-
 
 % output file for RV Distance Date etc
 outpath = subject_output;
@@ -98,6 +95,7 @@ while ( (longstr1(1) == '#') && (feof(infile) == 0) )
 end
 longstr2 = fgets(infile, 130);
 catno = strtrim(longstr1(3:7)); % Satelite Number
+disp(num2str(catno));
 %                // convert the char string to sgp4 elements
 %                // includes initialization of sgp4
 [satrec, startmfe, stopmfe, deltamin] = twoline2rv( whichconst, ...
@@ -106,24 +104,7 @@ longstr1, longstr2);
 
 
 %% main routine
-
-% --- Executes on button press in run.
-
-%   add operation smode for afspc (a) or improved (i)
-% opsmode= input('input opsmode afspc a, improved i ','s');
-% opsmode= 'a';
-
-%EH comented
-%         //typerun = 'c' compare 1 year of full satcat data
-%         //typerun = 'v' verification run, requires modified elm file with
-%         //typerun = 'm' maunual operation- either mfe, epoch, or dayof yr
-%         //              start stop and delta times
-
-%     typerun = input('input type of run c, v, m: ','s');
-%outfile = fopen('ManualOutput.out', 'wt');
-
-
-%% ----------------- test simple propagation -------------------
+% ----------------- test simple propagation -------------------
 
 longstr1 = fgets(infile, 130);
 while ( (longstr1(1) == '#') && (feof(infile) == 0) )
@@ -161,9 +142,7 @@ while ((tsince < stopmfe) && (satrec.error == 0))
         fprintf(1,'# *** error: t:= %f *** code = %3i\n', tsince, satrec.error);
     end
     
-
     if (satrec.error == 0)
-        if ((typerun ~= 'v') && (typerun ~= 'c'))
             jd = satrec.jdsatepoch + tsince/1440.0;
             [year,mon,day,hr,minute,sec] = invjday ( jd );
             
@@ -174,20 +153,7 @@ while ((tsince < stopmfe) && (satrec.error == 0))
             r_o(k,1)=ro(1);
             r_o(k,2)=ro(2);
             r_o(k,3)=ro(3);
-            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-            
-        else
-            jd = satrec.jdsatepoch + tsince/1440.0;
-            [year,mon,day,hr,minute,sec] = invjday ( jd );
-            
-            fprintf(outfile, ' %16.8f %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f',...
-                tsince,ro(1),ro(2),ro(3),vo(1),vo(2),vo(3));
- 
-            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-            
-            fprintf(outfile, ' %14.6f %8.6f %10.5f %10.5f %10.5f %10.5f %10.5f %5i%3i%3i %2i:%2i:%9.6f \n',...
-                a, ecc, incl*rad, node*rad, argp*rad, nu*rad, m*rad,year,mon,day,hr,minute,sec );
-        end
+            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);    
     end %// if satrec.error == 0
     k=k+1;
 end %// while propagating the orbit
@@ -223,13 +189,9 @@ disp('Loading Satellite Catalog, initiating propagation');
 
 %% Loading TLE drom file and propagating from catalog
 
-
 r_1=zeros(size(r_o,1),3);
 delta_r=zeros(size(r_o,1),3);
-
-
 i=1; %counter for satellite number list
-
 
 while (feof(infile) == 0)
     
@@ -245,7 +207,6 @@ while (feof(infile) == 0)
     [satrec, startmfe, stopmfe, deltamin] = twoline2rv( whichconst, ...
     longstr1, longstr2);
 
-
     %Test Propagation
     [~, ro ,vo] = sgp4 (satrec,  0.0);  %[satrec, ro ,vo] = sgp4 (satrec,  0.0);
     tsince = startmfe;
@@ -256,8 +217,7 @@ while (feof(infile) == 0)
 
     %%     loop to perform the main propagation
     k=1;
-    tic
-    %                
+                   
     while ((tsince < stopmfe) && (satrec.error == 0))
         if k==1
          [p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
@@ -278,36 +238,24 @@ while (feof(infile) == 0)
         end
 
         if (satrec.error == 0)
-            if ((typerun ~= 'v') && (typerun ~= 'c'))
-                jd = satrec.jdsatepoch + tsince/1440.0;
-                [year,mon,day,hr,minute,sec] = invjday ( jd );
-                %Print the below for TEME state
-                %fprintf(outfile,...
-                %    ' %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f %5i%3i%3i %2i %2i %9.6f \n',...
-                %    ro(1),ro(2),ro(3),vo(1),vo(2),vo(3),year,mon,day,hr,minute,sec );
-                r_1(k,1)=ro(1);
-                r_1(k,2)=ro(2);
-                r_1(k,3)=ro(3);
-                delta_r=((r_1(k,1)-r_o(k,1))^2+(r_1(k,2)-r_o(k,2))^2+(r_1(k,3)-r_o(k,3))^2)^(1/3);
-                %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-            end
+            jd = satrec.jdsatepoch + tsince/1440.0;
+            [year,mon,day,hr,minute,sec] = invjday ( jd );
+            delta_r=((ro(1)-r_o(k,1))^2+(ro(2)-r_o(k,2))^2+(ro(3)-r_o(k,3))^2)^(0.5);
         end %// if satrec.error == 0
         
         % Check for closest aproach distance and save it in file
         if delta_r<=min_dist
-         fprintf(outfile,'%5s %16.8f %5i%3i%3i %2i:%2i:%9.6f \n',catno,delta_r,year,mon,day,hr,minute,sec);
-         disp('********************   Close approach   *****************');
-         disp(str2double(catno));
-         disp(delta_r);
-         sat_no_list(i,1)=str2double(catno);
-         i=i+1;
-         break;
+            fprintf(outfile,'%5s %16.8f %5i%3i%3i %2i:%2i:%9.6f \n',catno,delta_r,year,mon,day,hr,minute,sec);
+            disp('********************   Close approach   *****************');
+            disp(str2double(catno));
+            disp(delta_r);
+            sat_no_list(i,1)=str2double(catno);
+            i=i+1;
+            break;
         end
         k=k+1;
-    end %// while propagating the orbit
-
-    
-end %// While Catalog
+    end % while propagating the orbit  
+end % While Catalog
 
 fclose('all');
 
@@ -317,7 +265,7 @@ disp('***************  Refining Propagations ********************');
 
 % Configuration Section
 
-s1='1'; % Refined Step Resolution
+s1='0.1'; % Refined Step Resolution
 
 %% propagate the subject satellite orbit
 
@@ -330,7 +278,6 @@ if (infile == -1)
     fprintf(1,'Failed to open file: %s\n', infilename);
     return;
 end
-
 
 % output file for RV Distance Date etc
 outpath = subject_output_refined;
@@ -359,9 +306,6 @@ catno = strtrim(longstr1(3:7)); % Satelite Number
 longstr1, longstr2);
 
 
-
-
-
 %% Main Routine
 %%----------------- test simple propagation -------------------
 
@@ -374,7 +318,6 @@ end
 [~, ro ,vo] = sgp4 (satrec,  0.0);  %[satrec, ro ,vo] = sgp4 (satrec,  0.0);
 
 tsince = startmfe;
-
 
 %                // check so the first value isn't written twice
 if ( abs(tsince) > 1.0e-8 )
@@ -401,43 +344,23 @@ while ((tsince < stopmfe) && (satrec.error == 0))
         fprintf(1,'# *** error: t:= %f *** code = %3i\n', tsince, satrec.error);
     end
     
-
     if (satrec.error == 0)
-        if ((typerun ~= 'v') && (typerun ~= 'c'))
-            jd = satrec.jdsatepoch + tsince/1440.0;
-            [year,mon,day,hr,minute,sec] = invjday ( jd );
-            
-            %Print the below for TEME state
-            fprintf(outfile,...
-                ' %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f %5i%3i%3i %2i %2i %9.6f \n',...
-                ro(1),ro(2),ro(3),vo(1),vo(2),vo(3),year,mon,day,hr,minute,sec );
-            r_o(k,1)=ro(1);
-            r_o(k,2)=ro(2);
-            r_o(k,3)=ro(3);
-            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-            
-        else
-            jd = satrec.jdsatepoch + tsince/1440.0;
-            [year,mon,day,hr,minute,sec] = invjday ( jd );
-            
-            fprintf(outfile, ' %16.8f %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f',...
-                tsince,ro(1),ro(2),ro(3),vo(1),vo(2),vo(3));
- 
-            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-            
-            fprintf(outfile, ' %14.6f %8.6f %10.5f %10.5f %10.5f %10.5f %10.5f %5i%3i%3i %2i:%2i:%9.6f \n',...
-                a, ecc, incl*rad, node*rad, argp*rad, nu*rad, m*rad,year,mon,day,hr,minute,sec );
-        end
+        jd = satrec.jdsatepoch + tsince/1440.0;
+        [year,mon,day,hr,minute,sec] = invjday ( jd );
+
+        %Print the below for TEME state
+        fprintf(outfile,...
+' %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f %5i%3i%3i %2i %2i %9.6f \n',...
+ro(1),ro(2),ro(3),vo(1),vo(2),vo(3),year,mon,day,hr,minute,sec );
+        r_o(k,1)=ro(1);
+        r_o(k,2)=ro(2);
+        r_o(k,3)=ro(3);
+        %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);  
     end %// if satrec.error == 0
     k=k+1;
 end %// while propagating the orbit
 
-
-
-
-
 %% Input and out files for the catalog
-
 
 inpath=catalog_file;
 infilename = inpath;
@@ -447,25 +370,19 @@ if (infile == -1)
     return;
 end
 
-
-
-
-
 disp('Fetching Close Satellites from the Catalog, initiating propagation');
 
 %% Loading TLE drom file and propagating from catalog
 
-
 r_1=zeros(size(r_o,1),3);
 delta_r=zeros(size(r_o,1),3);
 
-
 i=1; %counter for satellite number list
 
-while (feof(infile) == 0)
+while (feof(infile) == 0 && exist('sat_no_list'))
     
     min_distance=1000;
-    
+    k=1;
     longstr1 = fgets(infile, 130);
     while ( (longstr1(1) == '#') && (feof(infile) == 0) )
         longstr1 = fgets(infile, 130);
@@ -491,7 +408,6 @@ while (feof(infile) == 0)
     [satrec, startmfe, stopmfe, deltamin] = twoline2rv( whichconst, ...
     longstr1, longstr2);
 
-
     %Test Propagation
     [~, ro ,vo] = sgp4 (satrec,  0.0);  %[satrec, ro ,vo] = sgp4 (satrec,  0.0);
     tsince = startmfe;
@@ -501,7 +417,6 @@ while (feof(infile) == 0)
     end
 
     %%     loop to perform the main propagation
-    k=1;
     %                
     while ((tsince < stopmfe) && (satrec.error == 0))
         
@@ -517,28 +432,17 @@ while (feof(infile) == 0)
         end
 
         if (satrec.error == 0)
-            if ((typerun ~= 'v') && (typerun ~= 'c'))
-                jd = satrec.jdsatepoch + tsince/1440.0;
-                [year,mon,day,hr,minute,sec] = invjday ( jd );
-                %Print the below for TEME state
-                %fprintf(outfile,...
-                %    ' %16.8f %16.8f %16.8f %12.9f %12.9f %12.9f %5i%3i%3i %2i %2i %9.6f \n',...
-                %    ro(1),ro(2),ro(3),vo(1),vo(2),vo(3),year,mon,day,hr,minute,sec );
-                r_1(k,1)=ro(1);
-                r_1(k,2)=ro(2);
-                r_1(k,3)=ro(3);
-                delta_r=((r_1(k,1)-r_o(k,1))^2+(r_1(k,2)-r_o(k,2))^2+(r_1(k,3)-r_o(k,3))^2)^(1/3);
-                if delta_r<min_distance
-                    min_distance=delta_r;
-                    
-                end
-                %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
-                fprintf(outfile,'%5s %16.8f %16.8f %16.8f %16.8f %5i %3i %3i %2i %2i %9.6f \n',catno,ro(1),ro(2),ro(3),delta_r,year,mon,day,hr,minute,sec);
+            jd = satrec.jdsatepoch + tsince/1440.0;
+            [year,mon,day,hr,minute,sec] = invjday ( jd );
+            delta_r=norm(ro-r_o(k,:));
+            if delta_r<min_distance
+                min_distance=delta_r;
             end
+            %[p,a,ecc,incl,node,argp,nu,m,arglat,truelon,lonper ] = rv2coe (ro,vo,mu);
+            fprintf(outfile,'%5s %16.8f %16.8f %16.8f %16.8f %5i %3i %3i %2i %2i %9.6f \n',catno,ro(1),ro(2),ro(3),delta_r,year,mon,day,hr,minute,sec);
         end %// if satrec.error == 0
-        
         % Check for closest aproach distance and save it in file
-        
+        k=k+1;
     end %// while propagating the orbit
     disp(min_distance);
     i=i+1;
@@ -552,80 +456,7 @@ fclose('all');
 
 toc
 
-%% Ploting trajectory based on R
-% 
-% outfile=fopen('subject_output_refined.txt');
-% s=textscan(outfile,' %f %f %f %f %f %f %d %d %d %d %d %d');
-% fclose(outfile);
-% x=s{1};
-% y=s{2};
-% z=s{3};
-% % u=s{4};
-% % v=s{5};
-% % w=s{6};
-% 
-% outfile=fopen('sat_close_approach_refined_29110.txt');
-% s=textscan(outfile,'%f %f %f %f %d %d %d %d %d %d %d');
-% fclose(outfile);
-% x1=s{2};
-% y1=s{3};
-% z1=s{4};
-% 
-% 
-% close all
-% set(gcf,'Menubar','default','Name','Orbit Visualization', ... 
-%     'NumberTitle','off','Position',[10,350,750,750], ... 
-%     'Color',[0.38 0.26 0.67]); 
-% lim=(1+ecc)*a;%Setting the limits of the graph
-% clf
-% axis([-lim, lim, -lim, lim, -lim, lim])	
-% view(150,15) 
-% axis equal
-% shg
-% hold on
-% grid on
-% title('Orbital Visualization');
-% 
-% equat_rad=6378.13700;
-%     polar_rad=6356.7523142;
-%     [xx, yy, zz]=ellipsoid (0,0,0,equat_rad, equat_rad, polar_rad);
-%     load('topo.mat','topo','topomap1');
-%     topo2 = [topo(:,181:360) topo(:,1:180)];
-%     pro.FaceColor= 'texture';
-%     pro.EdgeColor = 'none';
-%     pro.FaceLighting = 'phong';
-%     pro.Cdata = topo2;
-%    earth= surface(xx,yy,zz,pro);
-%     colormap(topomap1)
-% 
-%     x0=0;
-%     y0=0;
-%     z0=0;
-%     
-%     x1_0=0;
-%     y1_0=0;
-%     z1_0=0;
-%     
-%     for k=1:length(x)
-%      line([x0 x(k)],[y0 y(k)],[z0 z(k)]);
-%      x0=x(k);
-%      y0=y(k);
-%      z0=z(k);
-%      
-%      line([x1_0 x1(k)],[y1_0 y1(k)],[z1_0 z1(k)],'Color','r');
-%      x1_0=x1(k);
-%      y1_0=y1(k);
-%      z1_0=z1(k);
-%      
-%      pause (0.01);
-%     end
-% 
-% 
-
-
 %%% Change Log
-
-
 
 % 30012017
 %   Saving sat_no_list with the closest satellites for later use
